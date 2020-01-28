@@ -611,4 +611,13 @@ ExPolygons elephant_foot_compensation(const ExPolygons &input, const Flow &exter
 	return out;
 }
 
+ExPolygons elephant_foot_compensation(const ExPolygons &input, double min_contour_width, const double compensation)
+{
+	ExPolygons out;
+	out.reserve(input.size());
+	for (const ExPolygon &expoly : input)
+		out.emplace_back(elephant_foot_compensation(expoly, min_contour_width, compensation));
+	return out;
+}
+
 } // namespace Slic3r

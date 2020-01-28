@@ -8,6 +8,8 @@
 #include <libslic3r/SLA/Pad.hpp>
 #include <libslic3r/SLA/SupportPointGenerator.hpp>
 
+#include <libslic3r/ElephantFootCompensation.hpp>
+
 #include <libslic3r/ClipperUtils.hpp>
 
 // For geometry algorithms with native Clipper types (no copies and conversions)
@@ -808,6 +810,16 @@ void SLAPrint::Steps::rasterize()
     
     // Sequential version (for testing)
     // for(unsigned l = 0; l < lvlcnt; ++l) lvlfn(l);
+    
+    double efc = m_print->m_printer_config.elefant_foot_compensation.getFloat();
+    std::vector<ClipperLib::Polygon> first_lyr = printer_input.front().transformed_slices();
+    ExPolygons first_lyr_ex; first_lyr_ex.reserve(first_lyr.size());
+    for (auto &p : first_lyr) {
+        ExPolygon ep;
+        ep.contour = ClipperPath_to_Slic3rPolygon(p.Contour);
+        ep.holes = ClipperPaths_to_Slic3rPolygons(p.Holes);
+    }
+    elephant_foot_compensation(first_lyr_ex, 0., efc);
     
     // Print all the layers in parallel
     sla::ccr::enumerate(printer_input.begin(), printer_input.end(), lvlfn);
