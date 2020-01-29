@@ -79,6 +79,18 @@ SLAPrint::Steps::Steps(SLAPrint *print)
     , objectstep_scale{(max_objstatus - min_objstatus) / (objcount * 100.0)}
 {}
 
+static ExPolygons to_expolygons(const std::vector<ClipperLib::Polygon> &polys)
+{
+    ExPolygons ret = reserve_vector<ExPolygon>(polys.size());
+    for (auto &p : polys) {
+        ret.emplace_back();
+        ret.back().contour = ClipperPath_to_Slic3rPolygon(p.Contour);
+        ret.back().holes = ClipperPaths_to_Slic3rPolygons(p.Holes);
+    }
+    
+    return ret;
+}
+
 void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
 {
     po.m_hollowing_data.reset();
@@ -573,6 +585,17 @@ void SLAPrint::Steps::initialize_printer_input()
     }
 }
 
+void SLAPrint::Steps::elephantfoot_compensate_printer_input()
+{
+    auto &pinput = m_print->m_printer_input;
+    if (pinput.empty()) return;
+    
+    double efc = m_print->m_printer_config.elefant_foot_compensation.getFloat();
+    ExPolygons first_lyr = to_expolygons(pinput.front().transformed_slices());
+    double min_contour_width = 0.; // TODO: What to do with this?
+    elephant_foot_compensation(first_lyr, min_contour_width, efc);
+}
+
 // Merging the slices from all the print objects into one slice grid and
 // calculating print statistics from the merge result.
 void SLAPrint::Steps::merge_slices_and_eval_stats() {
@@ -811,15 +834,7 @@ void SLAPrint::Steps::rasterize()
     // Sequential version (for testing)
     // for(unsigned l = 0; l < lvlcnt; ++l) lvlfn(l);
     
-    double efc = m_print->m_printer_config.elefant_foot_compensation.getFloat();
-    std::vector<ClipperLib::Polygon> first_lyr = printer_input.front().transformed_slices();
-    ExPolygons first_lyr_ex; first_lyr_ex.reserve(first_lyr.size());
-    for (auto &p : first_lyr) {
-        ExPolygon ep;
-        ep.contour = ClipperPath_to_Slic3rPolygon(p.Contour);
-        ep.holes = ClipperPaths_to_Slic3rPolygons(p.Holes);
-    }
-    elephant_foot_compensation(first_lyr_ex, 0., efc);
+    elephantfoot_compensate_printer_input();
     
     // Print all the layers in parallel
     sla::ccr::enumerate(printer_input.begin(), printer_input.end(), lvlfn);
