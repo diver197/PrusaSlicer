@@ -2430,7 +2430,7 @@ void PrintConfigDef::init_sla_params()
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(0));
+    def->set_default_value(new ConfigOptionFloat(0.2));
 
     def = this->add("gamma_correction", coFloat);
     def->label = L("Printer gamma correction");

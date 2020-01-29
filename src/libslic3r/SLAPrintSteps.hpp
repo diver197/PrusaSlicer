@@ -39,7 +39,6 @@ private:
     void throw_if_canceled() const { m_print->throw_if_canceled(); }
     bool canceled() const { return m_print->canceled(); }
     void initialize_printer_input();
-    void elephantfoot_compensate_printer_input();
     
 public:
     Steps(SLAPrint *print);

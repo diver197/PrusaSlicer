@@ -79,18 +79,6 @@ SLAPrint::Steps::Steps(SLAPrint *print)
     , objectstep_scale{(max_objstatus - min_objstatus) / (objcount * 100.0)}
 {}
 
-static ExPolygons to_expolygons(const std::vector<ClipperLib::Polygon> &polys)
-{
-    ExPolygons ret = reserve_vector<ExPolygon>(polys.size());
-    for (auto &p : polys) {
-        ret.emplace_back();
-        ret.back().contour = ClipperPath_to_Slic3rPolygon(p.Contour);
-        ret.back().holes = ClipperPaths_to_Slic3rPolygons(p.Holes);
-    }
-    
-    return ret;
-}
-
 void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
 {
     po.m_hollowing_data.reset();
@@ -202,12 +190,16 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     auto &slice_grid = po.m_model_height_levels;
     slicer.slice(slice_grid, closing_r, &po.m_model_slices, thr);
     
-//    sla::DrainHoles drainholes = po.transformed_drainhole_points();
-//    cut_drainholes(po.m_model_slices, slice_grid, closing_r, drainholes, thr);
-    
     auto mit = slindex_it;
     double doffs = m_print->m_printer_config.absolute_correction.getFloat();
     coord_t clpr_offs = scaled(doffs);
+    
+    if (!po.m_model_height_levels.empty() && po.m_model_height_levels[0] < ilh) {
+        auto &first_sl = po.m_model_slices[0];
+        double compensation = m_print->m_printer_config.elefant_foot_compensation.getFloat();
+        first_sl = elephant_foot_compensation(first_sl, 0., compensation);
+    }
+    
     for(size_t id = 0;
          id < po.m_model_slices.size() && mit != po.m_slice_index.end();
          id++)
@@ -419,6 +411,12 @@ void SLAPrint::Steps::slice_supports(SLAPrintObject &po) {
         
         sd->support_slices = sd->support_tree_ptr->slice(
                     heights, float(po.config().slice_closing_radius.value));
+        
+        if (!heights.empty() && heights[0] < ilh) {
+            auto &first_sl = sd->support_slices[0];
+            double compensation = m_print->m_printer_config.elefant_foot_compensation.getFloat();
+            first_sl = elephant_foot_compensation(first_sl, 0., compensation);
+        }
     }
     
     double doffs = m_print->m_printer_config.absolute_correction.getFloat();
@@ -583,17 +581,6 @@ void SLAPrint::Steps::initialize_printer_input()
             it->add(slicerecord);
         }
     }
-}
-
-void SLAPrint::Steps::elephantfoot_compensate_printer_input()
-{
-    auto &pinput = m_print->m_printer_input;
-    if (pinput.empty()) return;
-    
-    double efc = m_print->m_printer_config.elefant_foot_compensation.getFloat();
-    ExPolygons first_lyr = to_expolygons(pinput.front().transformed_slices());
-    double min_contour_width = 0.; // TODO: What to do with this?
-    elephant_foot_compensation(first_lyr, min_contour_width, efc);
 }
 
 // Merging the slices from all the print objects into one slice grid and
@@ -833,8 +820,6 @@ void SLAPrint::Steps::rasterize()
     
     // Sequential version (for testing)
     // for(unsigned l = 0; l < lvlcnt; ++l) lvlfn(l);
-    
-    elephantfoot_compensate_printer_input();
     
     // Print all the layers in parallel
     sla::ccr::enumerate(printer_input.begin(), printer_input.end(), lvlfn);
