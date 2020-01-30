@@ -2,6 +2,7 @@
 #define libslic3r_MeshBoolean_hpp_
 
 #include <memory>
+#include <exception>
 
 namespace Slic3r {
 
@@ -29,7 +30,11 @@ void self_union(TriangleMesh& mesh);
 // CGAL takes non-const objects as arguments. I suppose it doesn't change B but
 // there is no official garantee.
 void minus(CGALMesh &A, CGALMesh &B);
+void plus(CGALMesh &A, CGALMesh &B);
 void self_union(CGALMesh &A);
+
+bool does_self_intersect(const TriangleMesh &mesh);
+bool does_self_intersect(const CGALMesh &mesh);
 
 }
 

@@ -76,8 +76,9 @@ void self_union(TriangleMesh& mesh)
 
 namespace cgal {
 
-namespace CGALProc   = CGAL::Polygon_mesh_processing;
-namespace CGALParams = CGAL::Polygon_mesh_processing::parameters;
+namespace CGALProc    = CGAL::Polygon_mesh_processing;
+namespace CGALParams  = CGAL::Polygon_mesh_processing::parameters;
+using CGALException   = CGALProc::Corefinement::Self_intersection_exception;
 
 using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
 using _CGALMesh = CGAL::Surface_mesh<Kernel::Point_3>;
@@ -132,14 +133,39 @@ void cgal_to_triangle_mesh(const CGALMesh &cgalmesh, TriangleMesh &out)
     out = cgal_to_triangle_mesh(cgalmesh.m);
 }
 
-void minus(CGALMesh &A, CGALMesh &B)
+bool _cgal_diff(CGALMesh &A, CGALMesh &B)
 {
-    CGALProc::corefine_and_compute_difference(A.m, B.m, A.m);
+    const auto &p = CGALParams::throw_on_self_intersection(true);
+    return CGALProc::corefine_and_compute_difference(A.m, B.m, A.m, p, p);
 }
+
+bool _cgal_union(CGALMesh &A, CGALMesh &B)
+{
+    const auto &p = CGALParams::throw_on_self_intersection(true);
+    return CGALProc::corefine_and_compute_union(A.m, B.m, A.m, p, p);
+}
+
+template<class Op> void _cgal_do(Op &&op, CGALMesh &A, CGALMesh &B)
+{
+    bool success = false;
+    try {
+        success = op(A, B);
+    } catch (...) {
+        success = false;
+    }
+
+    if (! success)
+        throw std::runtime_error("CGAL mesh boolean operation failed.");
+}
+
+void minus(CGALMesh &A, CGALMesh &B) { _cgal_do(_cgal_diff, A, B); }
+void plus(CGALMesh &A, CGALMesh &B) { _cgal_do(_cgal_union, A, B); }
 
 void self_union(CGALMesh &A)
 {
-    CGALProc::corefine(A.m, A.m);
+     _cgal_do(_cgal_union, A, A); // TODO: this is not the way
+//    if (CGALProc::does_self_intersect(A.m))
+//        throw std::runtime_error("Self union is impossible!");
 }
 
 void minus(TriangleMesh &A, const TriangleMesh &B)
@@ -149,19 +175,30 @@ void minus(TriangleMesh &A, const TriangleMesh &B)
     triangle_mesh_to_cgal(A, meshA.m);
     triangle_mesh_to_cgal(B, meshB.m);
     
-    CGALMesh meshResult;
-    CGALProc::corefine_and_compute_difference(meshA.m, meshB.m, meshResult.m);
-    
-    A = cgal_to_triangle_mesh(meshResult.m);
+    minus(meshA, meshB);
+
+    A = cgal_to_triangle_mesh(meshA.m);
 }
 
 void self_union(TriangleMesh &m)
 {
-    _CGALMesh cgalmesh;
-    triangle_mesh_to_cgal(m, cgalmesh);
-    CGALProc::corefine(cgalmesh, cgalmesh);
+    CGALMesh cgalmesh;
+    triangle_mesh_to_cgal(m, cgalmesh.m);
+    self_union(cgalmesh);
     
-    m = cgal_to_triangle_mesh(cgalmesh);
+    m = cgal_to_triangle_mesh(cgalmesh.m);
+}
+
+bool does_self_intersect(const CGALMesh &mesh)
+{
+    return CGALProc::does_self_intersect(mesh.m);
+}
+
+bool does_self_intersect(const TriangleMesh &mesh)
+{
+    CGALMesh cgalm;
+    triangle_mesh_to_cgal(mesh, cgalm.m);
+    return CGALProc::does_self_intersect(cgalm.m);
 }
 
 } // namespace cgal
