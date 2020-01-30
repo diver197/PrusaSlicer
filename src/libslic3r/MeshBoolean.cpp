@@ -14,13 +14,13 @@
 namespace Slic3r {
 namespace MeshBoolean {
 
-typedef Eigen::Map<const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor | Eigen::DontAlign>> MapMatrixXfUnaligned;
-typedef Eigen::Map<const Eigen::Matrix<int,   Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor | Eigen::DontAlign>> MapMatrixXiUnaligned;
+using MapMatrixXfUnaligned = Eigen::Map<const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor | Eigen::DontAlign>>;
+using MapMatrixXiUnaligned = Eigen::Map<const Eigen::Matrix<int,   Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor | Eigen::DontAlign>>;
 
-typedef std::pair<Eigen::MatrixXd, Eigen::MatrixXi> EigenMesh;
-
-static TriangleMesh eigen_to_triangle_mesh(const Eigen::MatrixXd& VC, const Eigen::MatrixXi& FC)
+TriangleMesh eigen_to_triangle_mesh(const EigenMesh &emesh)
 {
+    auto &VC = emesh.first; auto &FC = emesh.second;
+    
     Pointf3s points(size_t(VC.rows())); 
     std::vector<Vec3crd> facets(size_t(FC.rows()));
     
@@ -35,7 +35,7 @@ static TriangleMesh eigen_to_triangle_mesh(const Eigen::MatrixXd& VC, const Eige
     return out;
 }
 
-static EigenMesh triangle_mesh_to_eigen_mesh(const TriangleMesh &mesh)
+EigenMesh triangle_mesh_to_eigen_mesh(const TriangleMesh &mesh)
 {
     EigenMesh emesh;
     emesh.first = MapMatrixXfUnaligned(mesh.its.vertices.front().data(),
@@ -57,8 +57,8 @@ void minus(TriangleMesh& A, const TriangleMesh& B)
     Eigen::MatrixXi FC;
     igl::MeshBooleanType boolean_type(igl::MESH_BOOLEAN_TYPE_MINUS);
     igl::copyleft::cgal::mesh_boolean(VA, FA, VB, FB, boolean_type, VC, FC);
-
-    A = eigen_to_triangle_mesh(VC, FC);
+    
+    A = eigen_to_triangle_mesh({VC, FC});
 }
 
 void self_union(TriangleMesh& mesh)
@@ -71,7 +71,7 @@ void self_union(TriangleMesh& mesh)
     igl::MeshBooleanType boolean_type(igl::MESH_BOOLEAN_TYPE_UNION);
     igl::copyleft::cgal::mesh_boolean(V, F, Eigen::MatrixXd(), Eigen::MatrixXi(), boolean_type, VC, FC);
     
-    mesh = eigen_to_triangle_mesh(VC, FC);
+    mesh = eigen_to_triangle_mesh({VC, FC});
 }
 
 namespace cgal {
@@ -128,9 +128,9 @@ std::unique_ptr<CGALMesh> triangle_mesh_to_cgal(const TriangleMesh &M)
     return out;
 }
 
-void cgal_to_triangle_mesh(const CGALMesh &cgalmesh, TriangleMesh &out)
+TriangleMesh cgal_to_triangle_mesh(const CGALMesh &cgalmesh)
 {
-    out = cgal_to_triangle_mesh(cgalmesh.m);
+    return cgal_to_triangle_mesh(cgalmesh.m);
 }
 
 bool _cgal_diff(CGALMesh &A, CGALMesh &B)

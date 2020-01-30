@@ -4,11 +4,17 @@
 #include <memory>
 #include <exception>
 
+#include <libslic3r/TriangleMesh.hpp>
+#include <Eigen/Geometry>
+
 namespace Slic3r {
 
-class TriangleMesh;
-
 namespace MeshBoolean {
+
+using EigenMesh = std::pair<Eigen::MatrixXd, Eigen::MatrixXi>;
+
+TriangleMesh eigen_to_triangle_mesh(const EigenMesh &emesh);
+EigenMesh triangle_mesh_to_eigen_mesh(const TriangleMesh &mesh);
 
 void minus(TriangleMesh& A, const TriangleMesh& B);
 void self_union(TriangleMesh& mesh);
@@ -18,7 +24,7 @@ namespace cgal {
 struct CGALMesh;
 
 std::unique_ptr<CGALMesh> triangle_mesh_to_cgal(const TriangleMesh &M);
-void cgal_to_triangle_mesh(const CGALMesh &cgalmesh, TriangleMesh &out);
+TriangleMesh cgal_to_triangle_mesh(const CGALMesh &cgalmesh);
     
 // Do boolean mesh difference with CGAL bypassing igl.
 void minus(TriangleMesh &A, const TriangleMesh &B);
