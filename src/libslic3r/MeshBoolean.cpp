@@ -35,7 +35,7 @@ TriangleMesh eigen_to_triangle_mesh(const EigenMesh &emesh)
     return out;
 }
 
-EigenMesh triangle_mesh_to_eigen_mesh(const TriangleMesh &mesh)
+EigenMesh triangle_mesh_to_eigen(const TriangleMesh &mesh)
 {
     EigenMesh emesh;
     emesh.first = MapMatrixXfUnaligned(mesh.its.vertices.front().data(),
@@ -48,30 +48,43 @@ EigenMesh triangle_mesh_to_eigen_mesh(const TriangleMesh &mesh)
     return emesh;
 }
 
-void minus(TriangleMesh& A, const TriangleMesh& B)
+void minus(EigenMesh &A, const EigenMesh &B)
 {
-    auto [VA, FA] = triangle_mesh_to_eigen_mesh(A);
-    auto [VB, FB] = triangle_mesh_to_eigen_mesh(B);
-
+    auto &[VA, FA] = A;
+    auto &[VB, FB] = B;
+    
     Eigen::MatrixXd VC;
     Eigen::MatrixXi FC;
     igl::MeshBooleanType boolean_type(igl::MESH_BOOLEAN_TYPE_MINUS);
     igl::copyleft::cgal::mesh_boolean(VA, FA, VB, FB, boolean_type, VC, FC);
     
-    A = eigen_to_triangle_mesh({VC, FC});
+    VA = std::move(VC); FA = std::move(FC);
 }
 
-void self_union(TriangleMesh& mesh)
+void minus(TriangleMesh& A, const TriangleMesh& B)
 {
-    auto [V, F] = triangle_mesh_to_eigen_mesh(mesh);
+    EigenMesh eA = triangle_mesh_to_eigen(A);
+    minus(eA, triangle_mesh_to_eigen(B));
+    A = eigen_to_triangle_mesh(eA);
+}
 
-    Eigen::MatrixXd VC;
-    Eigen::MatrixXi FC;
+void self_union(EigenMesh &A)
+{
+    EigenMesh result;
+    auto &[V, F] = A;
+    auto &[VC, FC] = result;
 
     igl::MeshBooleanType boolean_type(igl::MESH_BOOLEAN_TYPE_UNION);
     igl::copyleft::cgal::mesh_boolean(V, F, Eigen::MatrixXd(), Eigen::MatrixXi(), boolean_type, VC, FC);
     
-    mesh = eigen_to_triangle_mesh({VC, FC});
+    A = std::move(result);
+}
+
+void self_union(TriangleMesh& mesh)
+{
+    auto eM = triangle_mesh_to_eigen(mesh);
+    self_union(eM);
+    mesh = eigen_to_triangle_mesh(eM);
 }
 
 namespace cgal {
@@ -121,9 +134,9 @@ static TriangleMesh cgal_to_triangle_mesh(const _CGALMesh &cgalmesh)
     return out;
 }
 
-std::unique_ptr<CGALMesh> triangle_mesh_to_cgal(const TriangleMesh &M)
+std::unique_ptr<CGALMesh, CGALMeshDeleter> triangle_mesh_to_cgal(const TriangleMesh &M)
 {
-    auto out = std::make_unique<CGALMesh>();
+    std::unique_ptr<CGALMesh, CGALMeshDeleter> out(new CGALMesh{});
     triangle_mesh_to_cgal(M, out->m);
     return out;
 }
@@ -199,6 +212,11 @@ bool does_self_intersect(const TriangleMesh &mesh)
     CGALMesh cgalm;
     triangle_mesh_to_cgal(mesh, cgalm.m);
     return CGALProc::does_self_intersect(cgalm.m);
+}
+
+void CGALMeshDeleter::operator()(CGALMesh *ptr)
+{
+    delete ptr;
 }
 
 } // namespace cgal

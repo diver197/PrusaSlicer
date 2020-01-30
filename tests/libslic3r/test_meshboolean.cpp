@@ -6,7 +6,22 @@
 
 using namespace Slic3r;
 
-TEST_CASE("Self boolean for two spheres", "[MeshBoolean]")
+TEST_CASE("CGAL and TriangleMesh conversions", "[MeshBoolean]") {
+    TriangleMesh sphere = make_sphere(1.);
+    
+    auto cgalmesh_ptr = MeshBoolean::cgal::triangle_mesh_to_cgal(sphere);
+    
+    REQUIRE(cgalmesh_ptr);
+    
+    TriangleMesh M = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalmesh_ptr);
+    
+    REQUIRE(M.its.vertices.size() == sphere.its.vertices.size());
+    REQUIRE(M.its.indices.size() == sphere.its.indices.size());
+    
+    REQUIRE(M.volume() == Approx(sphere.volume()));
+}
+
+TEST_CASE("CGAL Self boolean for two spheres", "[MeshBoolean]")
 {
     TriangleMesh s1 = make_sphere(1.);
     TriangleMesh s2 = make_sphere(1.);
@@ -30,7 +45,7 @@ TEST_CASE("Self boolean for two spheres", "[MeshBoolean]")
     REQUIRE(! MeshBoolean::cgal::does_self_intersect(twospheres));
 }
 
-TEST_CASE("Mesh boolean for sphere and cylinder", "[MeshBoolean]")
+TEST_CASE("CGAL Mesh boolean for sphere and cylinder", "[MeshBoolean]")
 {
     static const double R_SPHERE = 1.;
     static const double R_CYL    = .5;
@@ -40,10 +55,14 @@ TEST_CASE("Mesh boolean for sphere and cylinder", "[MeshBoolean]")
     TriangleMesh cyl    = make_cylinder(R_CYL, H_CYL);
 
     double volume_shere = sphere.volume();
-    double volume_cyl   = cyl.volume(); 
+    double volume_cyl   = cyl.volume();
     
-    MeshBoolean::cgal::minus(sphere, cyl);
-    
+    try {
+        MeshBoolean::cgal::minus(sphere, cyl);
+    } catch (...) {
+        REQUIRE(false);
+    }
+
     double V = sphere.volume();
     REQUIRE(V == Approx(volume_shere - volume_cyl));
 }

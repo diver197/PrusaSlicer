@@ -14,8 +14,11 @@ namespace MeshBoolean {
 using EigenMesh = std::pair<Eigen::MatrixXd, Eigen::MatrixXi>;
 
 TriangleMesh eigen_to_triangle_mesh(const EigenMesh &emesh);
-EigenMesh triangle_mesh_to_eigen_mesh(const TriangleMesh &mesh);
+EigenMesh triangle_mesh_to_eigen(const TriangleMesh &mesh);
 
+void minus(EigenMesh &A, const EigenMesh &B);
+void self_union(EigenMesh &A);
+    
 void minus(TriangleMesh& A, const TriangleMesh& B);
 void self_union(TriangleMesh& mesh);
 
@@ -23,7 +26,9 @@ namespace cgal {
 
 struct CGALMesh;
 
-std::unique_ptr<CGALMesh> triangle_mesh_to_cgal(const TriangleMesh &M);
+struct CGALMeshDeleter { void operator()(CGALMesh *ptr); };
+
+std::unique_ptr<CGALMesh, CGALMeshDeleter> triangle_mesh_to_cgal(const TriangleMesh &M);
 TriangleMesh cgal_to_triangle_mesh(const CGALMesh &cgalmesh);
     
 // Do boolean mesh difference with CGAL bypassing igl.
