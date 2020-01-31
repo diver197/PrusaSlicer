@@ -47,22 +47,74 @@ TEST_CASE("CGAL Self boolean for two spheres", "[MeshBoolean]")
 
 TEST_CASE("CGAL Mesh boolean for sphere and cylinder", "[MeshBoolean]")
 {
-    static const double R_SPHERE = 1.;
-    static const double R_CYL    = .5;
-    static const double H_CYL    = .5;
-
-    TriangleMesh sphere = make_sphere(R_SPHERE);
-    TriangleMesh cyl    = make_cylinder(R_CYL, H_CYL);
+    TriangleMesh sphere = make_sphere(1.);
+    TriangleMesh cyl    = make_cylinder(.5, .5);
+    
+    REQUIRE(!sphere.needed_repair());
+    REQUIRE(cyl.is_manifold());
 
     double volume_shere = sphere.volume();
     double volume_cyl   = cyl.volume();
     
-    try {
-        MeshBoolean::cgal::minus(sphere, cyl);
-    } catch (...) {
-        REQUIRE(false);
+    SECTION("Do create hole inside the sphere") {
+        TriangleMesh result = sphere;
+        
+        try {
+            MeshBoolean::cgal::minus(result, cyl);
+        } catch (...) {
+            REQUIRE(false);
+        }
+        
+        double V = result.volume();
+        
+        REQUIRE(V == Approx(volume_shere - volume_cyl));
+        
+        REQUIRE(result.is_manifold());
+        CHECK(!result.needed_repair());
+        
+        result.WriteOBJFile("result1.obj");
     }
-
-    double V = sphere.volume();
-    REQUIRE(V == Approx(volume_shere - volume_cyl));
+    
+    SECTION("Remove and re-add a piece of the sphere") {
+        TriangleMesh result = sphere;
+        
+        // Make a cylinder going all the way through the sphere at the center
+        cyl = make_cylinder(.5, 2.5);
+        cyl.translate(0., 0., -1.25);
+        
+        REQUIRE(!cyl.needed_repair());
+        REQUIRE(cyl.is_manifold());
+        
+        TriangleMesh holed_sphere = sphere;
+        TriangleMesh missing_part = sphere;
+        
+        try {  
+            MeshBoolean::cgal::minus(holed_sphere, cyl);
+            
+            REQUIRE(holed_sphere.is_manifold());
+            CHECK(!holed_sphere.needed_repair());
+            holed_sphere.WriteOBJFile("tmp_holed_sphere.obj");
+        } catch (...) {
+            REQUIRE(false);
+        }
+        
+        try {
+            MeshBoolean::cgal::intersect(missing_part, cyl);
+            
+            REQUIRE(missing_part.is_manifold());
+            CHECK(!missing_part.needed_repair());
+            missing_part.WriteOBJFile("tmp_missing_part.obj");
+        } catch(...) { REQUIRE(false); }
+        
+        try {
+            result = holed_sphere;
+            MeshBoolean::cgal::plus(result, missing_part);
+            
+            REQUIRE(result.is_manifold());
+            CHECK(!result.needed_repair());
+            result.WriteOBJFile("result2.obj");
+        } catch (...) { REQUIRE(false); }
+        
+        REQUIRE(result.volume() == Approx(volume_shere));
+    }
 }

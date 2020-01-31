@@ -33,15 +33,16 @@ TriangleMesh cgal_to_triangle_mesh(const CGALMesh &cgalmesh);
     
 // Do boolean mesh difference with CGAL bypassing igl.
 void minus(TriangleMesh &A, const TriangleMesh &B);
+void plus(TriangleMesh &A, const TriangleMesh &B);
+void intersect(TriangleMesh &A, const TriangleMesh &B);
 
 // Do self union only with CGAL.
 void self_union(TriangleMesh& mesh);
 
-// does A = A - B
-// CGAL takes non-const objects as arguments. I suppose it doesn't change B but
-// there is no official garantee.
 void minus(CGALMesh &A, CGALMesh &B);
 void plus(CGALMesh &A, CGALMesh &B);
+void intersect(CGALMesh &A, CGALMesh &B);
+
 void self_union(CGALMesh &A);
 
 bool does_self_intersect(const TriangleMesh &mesh);

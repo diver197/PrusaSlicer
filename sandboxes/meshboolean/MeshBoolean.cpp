@@ -11,15 +11,14 @@
 
 #include <boost/log/trivial.hpp>
 
-namespace Slic3r {
-
-} // namespace Slic3r
-
 int main(const int argc, const char * argv[])
 {
     using namespace Slic3r;
     
-    if (argc <= 1) return EXIT_FAILURE;
+    if (argc <= 1) {
+        std::cout << "Usage: meshboolean <input_file.3mf>" << std::endl;
+        return EXIT_FAILURE;
+    }
     
     DynamicPrintConfig cfg;
     auto model = Model::read_from_file(argv[1], &cfg);

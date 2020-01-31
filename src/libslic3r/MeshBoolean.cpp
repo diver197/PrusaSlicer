@@ -146,23 +146,31 @@ TriangleMesh cgal_to_triangle_mesh(const CGALMesh &cgalmesh)
     return cgal_to_triangle_mesh(cgalmesh.m);
 }
 
-bool _cgal_diff(CGALMesh &A, CGALMesh &B)
+bool _cgal_diff(CGALMesh &A, CGALMesh &B, CGALMesh &R)
 {
     const auto &p = CGALParams::throw_on_self_intersection(true);
-    return CGALProc::corefine_and_compute_difference(A.m, B.m, A.m, p, p);
+    return CGALProc::corefine_and_compute_difference(A.m, B.m, R.m, p, p);
 }
 
-bool _cgal_union(CGALMesh &A, CGALMesh &B)
+bool _cgal_union(CGALMesh &A, CGALMesh &B, CGALMesh &R)
 {
     const auto &p = CGALParams::throw_on_self_intersection(true);
-    return CGALProc::corefine_and_compute_union(A.m, B.m, A.m, p, p);
+    return CGALProc::corefine_and_compute_union(A.m, B.m, R.m, p, p);
+}
+
+bool _cgal_intersection(CGALMesh &A, CGALMesh &B, CGALMesh &R)
+{
+    const auto &p = CGALParams::throw_on_self_intersection(true);
+    return CGALProc::corefine_and_compute_intersection(A.m, B.m, R.m, p, p);
 }
 
 template<class Op> void _cgal_do(Op &&op, CGALMesh &A, CGALMesh &B)
 {
     bool success = false;
     try {
-        success = op(A, B);
+        CGALMesh result;
+        success = op(A, B, result);
+        A = std::move(result);
     } catch (...) {
         success = false;
     }
@@ -173,24 +181,40 @@ template<class Op> void _cgal_do(Op &&op, CGALMesh &A, CGALMesh &B)
 
 void minus(CGALMesh &A, CGALMesh &B) { _cgal_do(_cgal_diff, A, B); }
 void plus(CGALMesh &A, CGALMesh &B) { _cgal_do(_cgal_union, A, B); }
+void intersect(CGALMesh &A, CGALMesh &B) { _cgal_do(_cgal_intersection, A, B); }
 
 void self_union(CGALMesh &A)
 {
-     _cgal_do(_cgal_union, A, A); // TODO: this is not the way
+//     _cgal_do(_cgal_union, A, A); // TODO: this is not the way
 //    if (CGALProc::does_self_intersect(A.m))
 //        throw std::runtime_error("Self union is impossible!");
 }
 
-void minus(TriangleMesh &A, const TriangleMesh &B)
-{   
+template<class Op> void _mesh_boolean_do(Op &&op, TriangleMesh &A, const TriangleMesh &B)
+{
     CGALMesh meshA;
     CGALMesh meshB;
     triangle_mesh_to_cgal(A, meshA.m);
     triangle_mesh_to_cgal(B, meshB.m);
     
-    minus(meshA, meshB);
-
+    _cgal_do(op, meshA, meshB);
+    
     A = cgal_to_triangle_mesh(meshA.m);
+}
+
+void minus(TriangleMesh &A, const TriangleMesh &B)
+{
+    _mesh_boolean_do(_cgal_diff, A, B);
+}
+
+void plus(TriangleMesh &A, const TriangleMesh &B)
+{
+    _mesh_boolean_do(_cgal_union, A, B);
+}
+
+void intersect(TriangleMesh &A, const TriangleMesh &B)
+{
+    _mesh_boolean_do(_cgal_intersection, A, B);
 }
 
 void self_union(TriangleMesh &m)
