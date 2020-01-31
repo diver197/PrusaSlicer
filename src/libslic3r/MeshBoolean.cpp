@@ -10,6 +10,10 @@
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
 #include <CGAL/Exact_integer.h>
 #include <CGAL/Surface_mesh.h>
+#include <CGAL/Polygon_mesh_processing/orient_polygon_soup.h>
+#include <CGAL/Polygon_mesh_processing/repair.h>
+#include <CGAL/Polygon_mesh_processing/polygon_soup_to_polygon_mesh.h>
+#include <CGAL/Polygon_mesh_processing/orientation.h>
 
 namespace Slic3r {
 namespace MeshBoolean {
@@ -100,13 +104,35 @@ struct CGALMesh { _CGALMesh m; };
 
 static void triangle_mesh_to_cgal(const TriangleMesh &M, _CGALMesh &out)
 {
-    for (const Vec3f &v : M.its.vertices)
-        out.add_vertex(_CGALMesh::Point(v.x(), v.y(), v.z()));
+//    using Index3 = std::array<size_t, 3>;
+//    auto points  = reserved_vector<_CGALMesh::Point>(M.its.vertices.size());
+//    auto indices = reserved_vector<Index3>(M.its.vertices.size());
+//    for (auto &v : M.its.vertices) points.emplace_back(v.x(), v.y(), v.z());
+//    for (auto &_f : M.its.indices) {
+//        auto f = _f.cast<size_t>();
+//        indices.emplace_back(Index3{f(0), f(1), f(2)});
+//    }
 
-    for (const Vec3crd &face : M.its.indices) {
-        auto f = face.cast<CGAL::SM_Vertex_index>();
-        out.add_face(f(0), f(1), f(2));
-    }
+//    CGALProc::orient_polygon_soup(points, indices);
+//    CGALProc::polygon_soup_to_polygon_mesh(points, indices, out);
+    
+//    // Number the faces because 'orient_to_bound_a_volume' needs a face <--> index map
+//    int index = 0;
+//    for (auto face : out.faces()) face = CGAL::SM_Face_index(index++);
+    
+//    if(CGAL::is_closed(out))
+//        CGALProc::orient_to_bound_a_volume(out);
+//    else
+//        std::runtime_error("Mesh not watertight");
+    
+//     Old stuff (faster but rather unsafe)
+        for (const Vec3f &v : M.its.vertices)
+            out.add_vertex(_CGALMesh::Point(v.x(), v.y(), v.z()));
+    
+        for (const Vec3crd &face : M.its.indices) {
+            auto f = face.cast<CGAL::SM_Vertex_index>();
+            out.add_face(f(0), f(1), f(2));
+        }    
 }
 
 static TriangleMesh cgal_to_triangle_mesh(const _CGALMesh &cgalmesh)
@@ -170,7 +196,13 @@ template<class Op> void _cgal_do(Op &&op, CGALMesh &A, CGALMesh &B)
     try {
         CGALMesh result;
         success = op(A, B, result);
+        bool bad = CGALProc::does_self_intersect(result.m);
+        std::cout << "does self intersect: " << bad << std::endl;
+        if (bad) {
+            CGALProc::remove_self_intersections(result.m);
+        }
         A = std::move(result);
+        std::cout << "does self intersect: " << CGALProc::does_self_intersect(A.m) << std::endl;
     } catch (...) {
         success = false;
     }
@@ -186,8 +218,6 @@ void intersect(CGALMesh &A, CGALMesh &B) { _cgal_do(_cgal_intersection, A, B); }
 void self_union(CGALMesh &A)
 {
 //     _cgal_do(_cgal_union, A, A); // TODO: this is not the way
-//    if (CGALProc::does_self_intersect(A.m))
-//        throw std::runtime_error("Self union is impossible!");
 }
 
 template<class Op> void _mesh_boolean_do(Op &&op, TriangleMesh &A, const TriangleMesh &B)
@@ -219,11 +249,34 @@ void intersect(TriangleMesh &A, const TriangleMesh &B)
 
 void self_union(TriangleMesh &m)
 {
-    CGALMesh cgalmesh;
-    triangle_mesh_to_cgal(m, cgalmesh.m);
-    self_union(cgalmesh);
+//    triangle_mesh_to_cgal(m, cgalmesh.m);
     
-    m = cgal_to_triangle_mesh(cgalmesh.m);
+    TriangleMeshPtrs parts = m.split();
+    
+    std::unique_ptr<CGALMesh, CGALMeshDeleter> cgalmeshptr;
+    for (TriangleMesh *part : parts) {
+        if (!part) continue;
+        part->repair();
+        if (!cgalmeshptr) {
+            cgalmeshptr = triangle_mesh_to_cgal(*part);
+            CGALProc::remove_self_intersections(cgalmeshptr->m);
+            if (parts.size() == 1) plus(*cgalmeshptr, *cgalmeshptr);
+        }
+        else {
+            CGALMesh partmesh;
+            triangle_mesh_to_cgal(*part, partmesh.m);
+            CGALProc::remove_self_intersections(partmesh.m);
+            CGALProc::remove_self_intersections(cgalmeshptr->m);
+            plus(*cgalmeshptr, partmesh);
+        }
+    }
+    
+    plus(*cgalmeshptr, *cgalmeshptr);
+    CGALProc::remove_self_intersections(cgalmeshptr->m);
+    
+    std::cout << "does self intersect: " << CGALProc::does_self_intersect(cgalmeshptr->m) << std::endl;
+    
+    if (cgalmeshptr) m = cgal_to_triangle_mesh(cgalmeshptr->m);
 }
 
 bool does_self_intersect(const CGALMesh &mesh)

@@ -12,6 +12,7 @@ TEST_CASE("CGAL and TriangleMesh conversions", "[MeshBoolean]") {
     auto cgalmesh_ptr = MeshBoolean::cgal::triangle_mesh_to_cgal(sphere);
     
     REQUIRE(cgalmesh_ptr);
+    REQUIRE(! MeshBoolean::cgal::does_self_intersect(*cgalmesh_ptr));
     
     TriangleMesh M = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalmesh_ptr);
     
@@ -19,15 +20,17 @@ TEST_CASE("CGAL and TriangleMesh conversions", "[MeshBoolean]") {
     REQUIRE(M.its.indices.size() == sphere.its.indices.size());
     
     REQUIRE(M.volume() == Approx(sphere.volume()));
+    
+    REQUIRE(! MeshBoolean::cgal::does_self_intersect(M));
 }
 
-TEST_CASE("CGAL Self boolean for two spheres", "[MeshBoolean]")
+TEST_CASE("Self boolean for two spheres", "[MeshBoolean]")
 {
     TriangleMesh s1 = make_sphere(1.);
     TriangleMesh s2 = make_sphere(1.);
     
     s1.translate(-0.25, 0., 0.);
-    s2.translate(-0.25, 0., 0.);
+    s2.translate(0.25, 0., 0.);
     
     TriangleMesh twospheres(s1);
     twospheres.merge(s2);
@@ -36,13 +39,27 @@ TEST_CASE("CGAL Self boolean for two spheres", "[MeshBoolean]")
     
     REQUIRE(MeshBoolean::cgal::does_self_intersect(twospheres));
     
-    try {
-        MeshBoolean::cgal::self_union(twospheres);
-    } catch (...) {
-        REQUIRE(false);
+    SECTION("CGAL self_boolean") {
+        try {
+            MeshBoolean::cgal::self_union(twospheres);
+            twospheres.WriteOBJFile("twospheres_cgal.obj");
+        } catch (...) {
+            REQUIRE(false);
+        }
+        
+        REQUIRE(! MeshBoolean::cgal::does_self_intersect(twospheres));
     }
     
-    REQUIRE(! MeshBoolean::cgal::does_self_intersect(twospheres));
+    SECTION("IGL self_boolean") {
+        try {
+            MeshBoolean::self_union(twospheres);
+            twospheres.WriteOBJFile("twospheres_igl.obj");
+        } catch (...) {
+            REQUIRE(false);
+        }
+        
+        REQUIRE(! MeshBoolean::cgal::does_self_intersect(twospheres));
+    }
 }
 
 TEST_CASE("CGAL Mesh boolean for sphere and cylinder", "[MeshBoolean]")
@@ -72,7 +89,7 @@ TEST_CASE("CGAL Mesh boolean for sphere and cylinder", "[MeshBoolean]")
         REQUIRE(result.is_manifold());
         CHECK(!result.needed_repair());
         
-        result.WriteOBJFile("result1.obj");
+        result.WriteOBJFile("hole_inside_sphere.obj");
     }
     
     SECTION("Remove and re-add a piece of the sphere") {

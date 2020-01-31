@@ -122,7 +122,7 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
         holes_mesh.merge(sla::to_triangle_mesh(holept.to_mesh()));
     
     holes_mesh.require_shared_vertices();
-    MeshBoolean::cgal::self_union(holes_mesh); //FIXME-fix and use the cgal version
+    MeshBoolean::self_union(holes_mesh); //FIXME-fix and use the cgal version
     
     // If there is no hollowed mesh yet, copy the original mesh.
     if (! po.m_hollowing_data) {

@@ -246,6 +246,15 @@ std::string string_printf(const char *const fmt, Args &&...args)
     return std::string(buffer.begin(), buffer.begin() + bufflen);
 }
 
+template<class T, class Allocator = std::allocator<T>> // Arbitrary allocator can be used
+inline std::vector<T, Allocator> reserved_vector(size_t capacity)
+{
+    std::vector<T, Allocator> ret;
+    if (capacity) ret.reserve(capacity);
+    
+    return ret;
+}
+
 } // namespace Slic3r
 
 #endif
