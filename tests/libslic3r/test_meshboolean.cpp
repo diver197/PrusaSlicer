@@ -73,7 +73,7 @@ TEST_CASE("CGAL Mesh boolean for sphere and cylinder", "[MeshBoolean]")
     double volume_shere = sphere.volume();
     double volume_cyl   = cyl.volume();
     
-    SECTION("Do create hole inside the sphere") {
+    SECTION("Create hole inside the sphere") {
         TriangleMesh result = sphere;
         
         try {
@@ -102,35 +102,52 @@ TEST_CASE("CGAL Mesh boolean for sphere and cylinder", "[MeshBoolean]")
         REQUIRE(!cyl.needed_repair());
         REQUIRE(cyl.is_manifold());
         
-        TriangleMesh holed_sphere = sphere;
-        TriangleMesh missing_part = sphere;
+        REQUIRE(!sphere.needed_repair());
+        REQUIRE(sphere.is_manifold());
         
-        try {  
-            MeshBoolean::cgal::minus(holed_sphere, cyl);
-            
-            REQUIRE(holed_sphere.is_manifold());
-            CHECK(!holed_sphere.needed_repair());
-            holed_sphere.WriteOBJFile("tmp_holed_sphere.obj");
-        } catch (...) {
-            REQUIRE(false);
-        }
+        auto _cyl         = MeshBoolean::cgal::triangle_mesh_to_cgal(cyl);
+        auto holed_sphere = MeshBoolean::cgal::triangle_mesh_to_cgal(sphere);
+        auto missing_part = MeshBoolean::cgal::triangle_mesh_to_cgal(sphere);
         
         try {
-            MeshBoolean::cgal::intersect(missing_part, cyl);
-            
-            REQUIRE(missing_part.is_manifold());
-            CHECK(!missing_part.needed_repair());
-            missing_part.WriteOBJFile("tmp_missing_part.obj");
-        } catch(...) { REQUIRE(false); }
-        
-        try {
-            result = holed_sphere;
-            MeshBoolean::cgal::plus(result, missing_part);
-            
-            REQUIRE(result.is_manifold());
-            CHECK(!result.needed_repair());
-            result.WriteOBJFile("result2.obj");
+            MeshBoolean::cgal::minus(*holed_sphere, *_cyl);
+            MeshBoolean::cgal::intersect(*missing_part, *_cyl);
+            MeshBoolean::cgal::plus(*holed_sphere, *missing_part);
+            TriangleMesh result = MeshBoolean::cgal::cgal_to_triangle_mesh(*holed_sphere);
+            REQUIRE(result .is_manifold());
+            CHECK(!result .needed_repair());
+            result.WriteOBJFile("result.obj");
         } catch (...) { REQUIRE(false); }
+        
+//        TriangleMesh holed_sphere = sphere;
+//        TriangleMesh missing_part = sphere;
+        
+//        try {  
+//            MeshBoolean::cgal::minus(holed_sphere, cyl);
+            
+//            REQUIRE(holed_sphere.is_manifold());
+//            CHECK(!holed_sphere.needed_repair());
+//            holed_sphere.WriteOBJFile("tmp_holed_sphere.obj");
+//        } catch (...) {
+//            REQUIRE(false);
+//        }
+        
+//        try {
+//            MeshBoolean::cgal::intersect(missing_part, cyl);
+            
+//            REQUIRE(missing_part.is_manifold());
+//            CHECK(!missing_part.needed_repair());
+//            missing_part.WriteOBJFile("tmp_missing_part.obj");
+//        } catch(...) { REQUIRE(false); }
+        
+//        try {
+//            result = holed_sphere;
+//            MeshBoolean::cgal::plus(result, missing_part);
+            
+//            REQUIRE(result.is_manifold());
+//            CHECK(!result.needed_repair());
+//            result.WriteOBJFile("result2.obj");
+//        } catch (...) { REQUIRE(false); }
         
         REQUIRE(result.volume() == Approx(volume_shere));
     }

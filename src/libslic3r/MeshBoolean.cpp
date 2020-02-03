@@ -97,7 +97,7 @@ namespace CGALProc    = CGAL::Polygon_mesh_processing;
 namespace CGALParams  = CGAL::Polygon_mesh_processing::parameters;
 using CGALException   = CGALProc::Corefinement::Self_intersection_exception;
 
-using Kernel = CGAL::Exact_predicates_inexact_constructions_kernel;
+using Kernel = CGAL::Exact_predicates_exact_constructions_kernel;
 using _CGALMesh = CGAL::Surface_mesh<Kernel::Point_3>;
 
 struct CGALMesh { _CGALMesh m; };
@@ -144,7 +144,7 @@ static TriangleMesh cgal_to_triangle_mesh(const _CGALMesh &cgalmesh)
 
     for (auto &vi : cgalmesh.vertices()) {
         auto &v = cgalmesh.point(vi); // Don't ask...
-        points.emplace_back(v.x(), v.y(), v.z());
+        points.emplace_back(v.x().interval().sup(), v.y().interval().sup(), v.z().interval().sup());
     }
 
     for (auto &face : cgalmesh.faces()) {
@@ -164,6 +164,7 @@ std::unique_ptr<CGALMesh, CGALMeshDeleter> triangle_mesh_to_cgal(const TriangleM
 {
     std::unique_ptr<CGALMesh, CGALMeshDeleter> out(new CGALMesh{});
     triangle_mesh_to_cgal(M, out->m);
+    std::cout << "does self intersect out: " << CGALProc::does_self_intersect(out->m) << std::endl;
     return out;
 }
 
@@ -195,14 +196,22 @@ template<class Op> void _cgal_do(Op &&op, CGALMesh &A, CGALMesh &B)
     bool success = false;
     try {
         CGALMesh result;
+        bool badA = CGALProc::does_self_intersect(A.m);
+        std::cout << "does self intersect A: " << badA << std::endl;
+        bool badB = CGALProc::does_self_intersect(B.m);
+        std::cout << "does self intersect B: " << badB << std::endl;
         success = op(A, B, result);
-        bool bad = CGALProc::does_self_intersect(result.m);
-        std::cout << "does self intersect: " << bad << std::endl;
-        if (bad) {
-            CGALProc::remove_self_intersections(result.m);
-        }
+
+        
+        bool badR = CGALProc::does_self_intersect(result.m);
+        std::cout << "does self intersect result: " << badR << std::endl;
+//        bool bad = CGALProc::does_self_intersect(result.m);
+//        std::cout << "does self intersect: " << bad << std::endl;
+//        if (bad) {
+//            CGALProc::remove_self_intersections(result.m);
+//        }
+//        std::cout << "does self intersect: " << CGALProc::does_self_intersect(result.m) << std::endl;
         A = std::move(result);
-        std::cout << "does self intersect: " << CGALProc::does_self_intersect(A.m) << std::endl;
     } catch (...) {
         success = false;
     }
