@@ -154,7 +154,7 @@ MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
 		"Updated configuration bundles:"
 	)), SLIC3R_APP_NAME));
 	
-	logo->SetBitmap(create_scaled_bitmap(this, "PrusaSlicer_192px_grayscale.png", 192));
+	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, 192));
 
 	text->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
 	content_sizer->Add(text);
@@ -317,7 +317,7 @@ MsgNoUpdates::MsgNoUpdates() :
 	content_sizer->Add(text);
 	content_sizer->AddSpacer(VERT_SPACING);
 
-	logo->SetBitmap(create_scaled_bitmap(this, "PrusaSlicer_192px_grayscale.png", 192));
+	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, 192));
 
 	Fit();
 }
